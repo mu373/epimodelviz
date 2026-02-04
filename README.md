@@ -1,4 +1,4 @@
-# modelviz
+# epimodelviz
 
 Visualize epidemiological compartment models from YAML.
 
