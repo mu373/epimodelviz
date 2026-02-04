@@ -68,7 +68,7 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
     transitionGroups[key].push(g);
   });
 
-  const overlays: JSX.Element[] = [];
+  const overlays: React.JSX.Element[] = [];
 
   Object.entries(transitionGroups).forEach(([, groups]) => {
     const s = nodes.find((n) => n.id === groups[0].targetSource);

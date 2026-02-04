@@ -43,6 +43,7 @@ export interface MediatorGroup {
 }
 
 export interface CompartmentNodeData {
+  [key: string]: unknown;
   id: string;
   label: string;
   isVaccinated: boolean;
@@ -50,6 +51,7 @@ export interface CompartmentNodeData {
 }
 
 export interface TransitionEdgeData {
+  [key: string]: unknown;
   type: string;
   rate: string;
   showLabel: boolean;

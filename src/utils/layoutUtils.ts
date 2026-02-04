@@ -1,12 +1,11 @@
 import type { Node, Edge } from '@xyflow/react';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force';
 import type { CompartmentNodeData } from '../types/model';
-import { getCompartmentBaseName } from './colorUtils';
 import { getCompartmentGroup, getOrderedColumns } from './yamlParser';
 
 export function applyHierarchicalLayout(
   nodes: Node<CompartmentNodeData>[],
-  width: number,
+  _width: number,
   height: number,
   columnOrder: string[],
 ): Node<CompartmentNodeData>[] {
