@@ -82,6 +82,7 @@ export default function FlowCanvas({
           nodeStrokeWidth={2}
           zoomable
           pannable
+          style={{ width: 160, height: 126, borderRadius: '0.5rem', overflow: 'hidden', boxShadow: 'none', border: '1px solid #e5e7eb' }}
         />
         <Controls />
         <Background />

@@ -1,6 +1,6 @@
 export default function Legend() {
   return (
-    <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-lg p-3 text-xs z-10">
+    <div className="absolute bottom-4 right-[195px] bg-white rounded-lg border border-gray-200 p-3 text-xs z-10">
       <div className="font-medium text-gray-900 mb-2">Transition Types</div>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
