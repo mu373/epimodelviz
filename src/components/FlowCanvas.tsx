@@ -35,6 +35,7 @@ interface FlowCanvasProps {
   mediatorGroups: MediatorGroup[];
   showMediators: boolean;
   showMediated: boolean;
+  showLabels: boolean;
 }
 
 export default function FlowCanvas({
@@ -45,6 +46,7 @@ export default function FlowCanvas({
   mediatorGroups,
   showMediators,
   showMediated,
+  showLabels,
 }: FlowCanvasProps) {
   const hasModel = nodes.length > 0;
 
@@ -90,6 +92,7 @@ export default function FlowCanvas({
           nodes={nodes}
           mediatorGroups={mediatorGroups}
           visible={showMediators && showMediated}
+          showLabels={showLabels}
         />
       </ReactFlow>
       {hasModel && <Legend />}

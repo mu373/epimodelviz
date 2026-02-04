@@ -8,6 +8,7 @@ interface MediatorOverlayProps {
   nodes: Node<CompartmentNodeData>[];
   mediatorGroups: MediatorGroup[];
   visible: boolean;
+  showLabels: boolean;
 }
 
 interface BoxPosition {
@@ -54,7 +55,7 @@ function getEdgeMidpoint(s: Node<CompartmentNodeData>, t: Node<CompartmentNodeDa
   return { x: (sx + tx) / 2, y: (sy + ty) / 2 };
 }
 
-function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProps) {
+function MediatorOverlay({ nodes, mediatorGroups, visible, showLabels }: MediatorOverlayProps) {
   const [hoveredBox, setHoveredBox] = useState<{ source: string; rate: string; mouseX: number; mouseY: number } | null>(null);
   const [hoveredArrow, setHoveredArrow] = useState<{ sources: string[]; rate: string; mouseX: number; mouseY: number } | null>(null);
 
@@ -202,7 +203,7 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
         );
 
         // Rate label
-        overlays.push(
+        if (showLabels) overlays.push(
           <div
             key={`${groupData.id}-${setIdx}-rate`}
             className="nodrag nopan pointer-events-none"
