@@ -1,7 +1,7 @@
 model:
   name: "simple_slir"
   version: "v0.0.1"
-  date: "2024-08-05" # YYYY-MM-DD
+  date: "2024-08-05"
 
   compartments:
     - id: S
@@ -23,15 +23,13 @@ model:
     - type: mediated
       source: S
       target: L
-      mediators:
-        rate: beta_1
-        source: I_1
+      mediator: I_1
+      rate: beta_1
     - type: mediated
       source: S
       target: L
-      mediators:
-        rate: beta_2
-        source: I_2
+      mediator: I_2
+      rate: beta_2
     - type: spontaneous
       source: L
       target: I_1
@@ -56,4 +54,3 @@ model:
       source: H_2
       target: R
       rate: mu
-    
