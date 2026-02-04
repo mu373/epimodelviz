@@ -11,6 +11,7 @@ function CompartmentNode({ data }: NodeProps<CompartmentNodeType>) {
   return (
     <div
       className="relative"
+      style={{ width: 80, height: 40 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -37,10 +38,10 @@ function CompartmentNode({ data }: NodeProps<CompartmentNodeType>) {
         </div>
       </div>
 
-      {/* Sublabel */}
+      {/* Sublabel — positioned absolutely so it doesn't affect node measurement */}
       <div
-        className="text-center text-gray-500 leading-tight mt-0.5"
-        style={{ fontSize: 9, width: 80, wordWrap: 'break-word' }}
+        className="absolute text-center text-gray-500 leading-tight"
+        style={{ fontSize: 9, width: 80, wordWrap: 'break-word', top: 42 }}
       >
         {data.label}
       </div>
@@ -53,10 +54,15 @@ function CompartmentNode({ data }: NodeProps<CompartmentNodeType>) {
         </div>
       )}
 
-      <Handle type="target" position={Position.Top} id="top" />
-      <Handle type="target" position={Position.Left} id="left" />
-      <Handle type="source" position={Position.Bottom} id="bottom" />
-      <Handle type="source" position={Position.Right} id="right" />
+      {/* Source + target handle on each side so edges connect to nearest side */}
+      <Handle type="source" position={Position.Top} id="source-top" />
+      <Handle type="source" position={Position.Right} id="source-right" />
+      <Handle type="source" position={Position.Bottom} id="source-bottom" />
+      <Handle type="source" position={Position.Left} id="source-left" />
+      <Handle type="target" position={Position.Top} id="target-top" />
+      <Handle type="target" position={Position.Right} id="target-right" />
+      <Handle type="target" position={Position.Bottom} id="target-bottom" />
+      <Handle type="target" position={Position.Left} id="target-left" />
     </div>
   );
 }

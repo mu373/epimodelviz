@@ -175,19 +175,52 @@ export function useModelState() {
     [nodes.length, state.yamlText, state.layout, applyLayoutToNodes],
   );
 
-  // Filter visible edges
+  // Filter visible edges and assign nearest-side handles
   const visibleEdges = useMemo(() => {
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
     return edges.filter((e) => {
       const t = e.data?.type ?? e.type;
       if (t === 'spontaneous' && !state.displayOptions.showSpontaneous) return false;
       if (t === 'mediated' && !state.displayOptions.showMediated) return false;
       if (t === 'vaccination' && !state.displayOptions.showVaccination) return false;
       return true;
-    }).map((e) => ({
-      ...e,
-      data: { ...e.data!, showLabel: state.displayOptions.showLabels },
-    }));
-  }, [edges, state.displayOptions]);
+    }).map((e) => {
+      const src = nodeMap.get(e.source);
+      const tgt = nodeMap.get(e.target);
+
+      let sourceHandle = 'source-right';
+      let targetHandle = 'target-left';
+
+      if (src && tgt) {
+        const dx = tgt.position.x - src.position.x;
+        const dy = tgt.position.y - src.position.y;
+        const angle = Math.atan2(dy, dx);
+
+        // Pick the side facing the other node
+        if (Math.abs(angle) < Math.PI / 4) {
+          sourceHandle = 'source-right';
+          targetHandle = 'target-left';
+        } else if (Math.abs(angle) > (3 * Math.PI) / 4) {
+          sourceHandle = 'source-left';
+          targetHandle = 'target-right';
+        } else if (angle > 0) {
+          sourceHandle = 'source-bottom';
+          targetHandle = 'target-top';
+        } else {
+          sourceHandle = 'source-top';
+          targetHandle = 'target-bottom';
+        }
+      }
+
+      return {
+        ...e,
+        sourceHandle,
+        targetHandle,
+        data: { ...e.data!, showLabel: state.displayOptions.showLabels },
+      };
+    });
+  }, [edges, nodes, state.displayOptions]);
 
   return {
     state,

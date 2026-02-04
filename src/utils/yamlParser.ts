@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import type { Node, Edge } from '@xyflow/react';
+import { MarkerType, type Node, type Edge } from '@xyflow/react';
 import type {
   ModelConfig,
   CompartmentNodeData,
@@ -82,11 +82,15 @@ export function parseModel(yamlText: string): ParseResult {
       }
     }
 
+    const resolvedType = edgeType === 'vaccination' ? 'vaccination' : edgeType === 'mediated' ? 'mediated' : 'spontaneous';
+    const markerColor = resolvedType === 'mediated' ? '#f59e0b' : resolvedType === 'vaccination' ? '#644391' : '#6b7280';
+
     edges.push({
       id: `edge-${i}`,
       source: trans.source,
       target: trans.target,
-      type: edgeType === 'vaccination' ? 'vaccination' : edgeType === 'mediated' ? 'mediated' : 'spontaneous',
+      type: resolvedType,
+      markerEnd: { type: MarkerType.ArrowClosed, color: markerColor },
       data: {
         type: edgeType,
         rate: trans.rate ?? '',

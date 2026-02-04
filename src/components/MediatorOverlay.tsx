@@ -1,4 +1,5 @@
 import { memo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { EdgeLabelRenderer, type Node } from '@xyflow/react';
 import type { CompartmentNodeData, MediatorGroup } from '../types/model';
 import { getCompartmentColor } from '../utils/colorUtils';
@@ -16,9 +17,46 @@ interface BoxPosition {
   color: string;
 }
 
+const NODE_W = 80;
+const NODE_H = 40;
+
+/** Compute the actual edge midpoint using the same angle-based handle selection as useModelState */
+function getEdgeMidpoint(s: Node<CompartmentNodeData>, t: Node<CompartmentNodeData>) {
+  const sCx = s.position.x + NODE_W / 2;
+  const sCy = s.position.y + NODE_H / 2;
+  const tCx = t.position.x + NODE_W / 2;
+  const tCy = t.position.y + NODE_H / 2;
+
+  const dx = tCx - sCx;
+  const dy = tCy - sCy;
+  const angle = Math.atan2(dy, dx);
+
+  let sx: number, sy: number, tx: number, ty: number;
+
+  if (Math.abs(angle) < Math.PI / 4) {
+    // source right → target left
+    sx = s.position.x + NODE_W;  sy = s.position.y + NODE_H / 2;
+    tx = t.position.x;           ty = t.position.y + NODE_H / 2;
+  } else if (Math.abs(angle) > (3 * Math.PI) / 4) {
+    // source left → target right
+    sx = s.position.x;           sy = s.position.y + NODE_H / 2;
+    tx = t.position.x + NODE_W;  ty = t.position.y + NODE_H / 2;
+  } else if (angle > 0) {
+    // source bottom → target top
+    sx = s.position.x + NODE_W / 2;  sy = s.position.y + NODE_H;
+    tx = t.position.x + NODE_W / 2;  ty = t.position.y;
+  } else {
+    // source top → target bottom
+    sx = s.position.x + NODE_W / 2;  sy = s.position.y;
+    tx = t.position.x + NODE_W / 2;  ty = t.position.y + NODE_H;
+  }
+
+  return { x: (sx + tx) / 2, y: (sy + ty) / 2 };
+}
+
 function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProps) {
-  const [hoveredBox, setHoveredBox] = useState<{ source: string; rate: string } | null>(null);
-  const [hoveredArrow, setHoveredArrow] = useState<{ sources: string[]; rate: string } | null>(null);
+  const [hoveredBox, setHoveredBox] = useState<{ source: string; rate: string; mouseX: number; mouseY: number } | null>(null);
+  const [hoveredArrow, setHoveredArrow] = useState<{ sources: string[]; rate: string; mouseX: number; mouseY: number } | null>(null);
 
   if (!visible || mediatorGroups.length === 0) return null;
 
@@ -37,8 +75,9 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
     const t = nodes.find((n) => n.id === groups[0].targetTarget);
     if (!s || !t) return;
 
-    const baseX = (s.position.x + t.position.x) / 2 + 40; // +40 for node center offset
-    const baseY = (s.position.y + t.position.y) / 2 + 20 + 70; // +20 for node center, +70 offset below
+    const mid = getEdgeMidpoint(s, t);
+    const baseX = mid.x;
+    const baseY = mid.y + 70; // 70px below the edge midpoint
 
     let cumulativeY = 0;
 
@@ -71,7 +110,7 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
         });
 
         const setMinY = Math.min(...positions.map((p) => p.y));
-        const targetY = (s.position.y + t.position.y) / 2 + 20;
+        const targetY = mid.y;
 
         // Render boxes
         positions.forEach((pos, idx) => {
@@ -94,9 +133,10 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
                 fontWeight: 600,
                 color: pos.color,
                 cursor: 'pointer',
+                pointerEvents: 'auto',
                 zIndex: 5,
               }}
-              onMouseEnter={() => setHoveredBox({ source: pos.source, rate: set.rate })}
+              onMouseEnter={(e) => setHoveredBox({ source: pos.source, rate: set.rate, mouseX: e.clientX, mouseY: e.clientY })}
               onMouseLeave={() => setHoveredBox(null)}
             >
               {pos.source.length > 10 ? pos.source.substring(0, 8) + '...' : pos.source}
@@ -104,7 +144,7 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
           );
         });
 
-        // Arrow line (SVG overlay)
+        // Arrow line (SVG overlay) — no pointerEvents: none on container
         overlays.push(
           <svg
             key={`${groupData.id}-${setIdx}-arrow`}
@@ -112,7 +152,7 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
             style={{
               position: 'absolute',
               overflow: 'visible',
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
               left: 0,
               top: 0,
               width: 1,
@@ -134,6 +174,19 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
                 <path d="M0,-5L10,0L0,5" fill="#f59e0b" />
               </marker>
             </defs>
+            {/* Invisible wide hit area for arrow */}
+            <line
+              x1={arrowX}
+              y1={setMinY - 15}
+              x2={arrowX}
+              y2={targetY}
+              stroke="transparent"
+              strokeWidth={16}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={(e) => setHoveredArrow({ sources: set.sources, rate: set.rate, mouseX: e.clientX, mouseY: e.clientY })}
+              onMouseLeave={() => setHoveredArrow(null)}
+            />
+            {/* Visible arrow */}
             <line
               x1={arrowX}
               y1={setMinY - 15}
@@ -143,9 +196,7 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
               strokeWidth={1.5}
               strokeOpacity={0.7}
               markerEnd={`url(#mediator-arrow-${groupData.id}-${setIdx})`}
-              style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
-              onMouseEnter={() => setHoveredArrow({ sources: set.sources, rate: set.rate })}
-              onMouseLeave={() => setHoveredArrow(null)}
+              style={{ pointerEvents: 'none' }}
             />
           </svg>,
         );
@@ -181,52 +232,46 @@ function MediatorOverlay({ nodes, mediatorGroups, visible }: MediatorOverlayProp
     });
   });
 
-  return (
-    <EdgeLabelRenderer>
-      {overlays}
-
-      {/* Tooltip for hovered box */}
+  // Portal tooltips to document.body so they aren't affected by React Flow transforms
+  const tooltip = (hoveredBox || hoveredArrow) ? createPortal(
+    <div
+      className="pointer-events-none"
+      style={{
+        position: 'fixed',
+        left: (hoveredBox?.mouseX ?? hoveredArrow?.mouseX ?? 0) + 10,
+        top: (hoveredBox?.mouseY ?? hoveredArrow?.mouseY ?? 0) - 60,
+        background: '#1f2937',
+        color: 'white',
+        fontSize: 12,
+        borderRadius: 8,
+        padding: '6px 10px',
+        zIndex: 10000,
+        whiteSpace: 'nowrap',
+      }}
+    >
       {hoveredBox && (
-        <div
-          className="pointer-events-none"
-          style={{
-            position: 'fixed',
-            top: 10,
-            right: 10,
-            background: '#1f2937',
-            color: 'white',
-            fontSize: 12,
-            borderRadius: 8,
-            padding: '6px 10px',
-            zIndex: 100,
-          }}
-        >
+        <>
           <div className="font-medium">Mediator: {hoveredBox.source}</div>
-          <div className="text-gray-300">Rate: {hoveredBox.rate}</div>
-        </div>
+          <div style={{ color: '#d1d5db' }}>Rate: {hoveredBox.rate}</div>
+        </>
       )}
-
-      {/* Tooltip for hovered arrow */}
       {hoveredArrow && (
-        <div
-          className="pointer-events-none"
-          style={{
-            position: 'fixed',
-            top: 10,
-            right: 10,
-            background: '#1f2937',
-            color: 'white',
-            fontSize: 12,
-            borderRadius: 8,
-            padding: '6px 10px',
-            zIndex: 100,
-          }}
-        >
-          <div className="text-gray-300">Mediators: {hoveredArrow.sources.join(', ')}</div>
-          <div className="text-gray-300">Rate: {hoveredArrow.rate}</div>
-        </div>
+        <>
+          <div style={{ color: '#d1d5db' }}>Mediators: {hoveredArrow.sources.join(', ')}</div>
+          <div style={{ color: '#d1d5db' }}>Rate: {hoveredArrow.rate}</div>
+        </>
       )}
-    </EdgeLabelRenderer>
+    </div>,
+    document.body,
+  ) : null;
+
+  return (
+    <>
+      <EdgeLabelRenderer>
+        {overlays}
+      </EdgeLabelRenderer>
+      {tooltip}
+    </>
   );
 }
 
