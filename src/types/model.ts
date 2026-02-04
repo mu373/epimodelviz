@@ -48,6 +48,7 @@ export interface CompartmentNodeData {
   label: string;
   isVaccinated: boolean;
   color: string;
+  showLabel?: boolean;
 }
 
 export interface TransitionEdgeData {

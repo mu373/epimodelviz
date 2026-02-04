@@ -10,6 +10,7 @@ interface DisplayOptions {
   showMediated: boolean;
   showVaccination: boolean;
   showLabels: boolean;
+  showCompartmentLabels: boolean;
   showMediators: boolean;
 }
 
@@ -61,6 +62,7 @@ const initialState: AppState = {
     showMediated: true,
     showVaccination: true,
     showLabels: true,
+    showCompartmentLabels: true,
     showMediators: true,
   },
   layout: 'hierarchical',
@@ -175,6 +177,14 @@ export function useModelState() {
     [nodes.length, state.yamlText, state.layout, applyLayoutToNodes],
   );
 
+  // Propagate display options into node data
+  const visibleNodes = useMemo(() => {
+    return nodes.map((n) => ({
+      ...n,
+      data: { ...n.data, showLabel: state.displayOptions.showCompartmentLabels },
+    }));
+  }, [nodes, state.displayOptions.showCompartmentLabels]);
+
   // Filter visible edges and assign nearest-side handles
   const visibleEdges = useMemo(() => {
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -225,7 +235,7 @@ export function useModelState() {
   return {
     state,
     dispatch,
-    nodes,
+    nodes: visibleNodes,
     setNodes,
     onNodesChange,
     edges: visibleEdges,
