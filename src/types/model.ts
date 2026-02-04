@@ -8,6 +8,9 @@ export interface TransitionDef {
   source: string;
   target: string;
   rate?: string;
+  /** New format: singular mediator compartment ID */
+  mediator?: string;
+  /** Old format: mediators object or array */
   mediators?:
     | { rate: string; source: string }
     | Array<{ rate: string; source: string | string[] }>;

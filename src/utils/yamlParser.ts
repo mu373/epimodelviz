@@ -46,7 +46,21 @@ export function parseModel(yamlText: string): ParseResult {
   transitions.forEach((trans, i) => {
     let edgeType = trans.type ?? 'spontaneous';
 
-    // Handle mediated transitions
+    // Handle mediated transitions — new format: mediator (singular string) + rate at top level
+    if (trans.type === 'mediated' && trans.mediator && typeof trans.mediator === 'string') {
+      const rate = trans.rate ?? '';
+      const groupKey = `${trans.source}-${trans.target}-${rate}`;
+      if (!mediatorGroupMap[groupKey]) {
+        mediatorGroupMap[groupKey] = {
+          targetSource: trans.source,
+          targetTarget: trans.target,
+          mediatorSets: [{ rate, sources: [] }],
+        };
+      }
+      mediatorGroupMap[groupKey].mediatorSets[0].sources.push(trans.mediator);
+    }
+
+    // Handle mediated transitions — old format: mediators object { rate, source }
     if (trans.type === 'mediated' && trans.mediators && !Array.isArray(trans.mediators)) {
       const med = trans.mediators as { rate: string; source: string };
       const groupKey = `${trans.source}-${trans.target}-${med.rate}`;

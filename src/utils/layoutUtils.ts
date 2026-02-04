@@ -25,7 +25,7 @@ export function applyHierarchicalLayout(
 
   const orderedCols = getOrderedColumns(nodes, columnOrder);
   let x = 100;
-  const xStep = Math.min(200, (width - 200) / Math.max(orderedCols.length, 1));
+  const xStep = 250;
 
   orderedCols.forEach((colKey) => {
     const col = groups[colKey];
