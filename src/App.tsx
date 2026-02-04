@@ -7,6 +7,7 @@ import FlowCanvas from './components/FlowCanvas';
 import ColumnOrderDialog from './components/ColumnOrderDialog';
 import { getOrderedColumns } from './utils/yamlParser';
 import { DEFAULT_COLUMN_ORDER } from './constants/colors';
+import { exportToSvg } from './utils/exportUtils';
 
 function AppInner() {
   const {
@@ -37,6 +38,15 @@ function AppInner() {
     visualize();
   }, [visualize]);
 
+  const handleExport = useCallback(() => {
+    exportToSvg({
+      nodes,
+      edges,
+      mediatorGroups: state.mediatorGroups,
+      showMediators: state.displayOptions.showMediators && state.displayOptions.showMediated,
+    });
+  }, [nodes, edges, state.mediatorGroups, state.displayOptions.showMediators, state.displayOptions.showMediated]);
+
   const columns = nodes.length > 0 ? getOrderedColumns(nodes, state.columnOrder) : [];
 
   return (
@@ -65,6 +75,7 @@ function AppInner() {
             layout={state.layout}
             onLayoutChange={changeLayout}
             onColumnOrderClick={() => dispatch({ type: 'TOGGLE_DIALOG' })}
+            onExport={handleExport}
           />
           <div className="flex-1">
             <FlowCanvas

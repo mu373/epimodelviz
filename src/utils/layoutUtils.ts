@@ -103,10 +103,10 @@ export function applyForceLayout(
   }));
 
   const sim = forceSimulation(simNodes)
-    .force('link', forceLink(simLinks).id((d: any) => d.id).distance(150))
-    .force('charge', forceManyBody().strength(-500))
+    .force('link', forceLink(simLinks).id((d: any) => d.id).distance(200))
+    .force('charge', forceManyBody().strength(-800))
     .force('center', forceCenter(width / 2, height / 2))
-    .force('collision', forceCollide().radius(50))
+    .force('collision', forceCollide().radius(80))
     .on('tick', () => {
       const positions = new Map<string, { x: number; y: number }>();
       simNodes.forEach((sn) => {

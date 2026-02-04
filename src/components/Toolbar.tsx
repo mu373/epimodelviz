@@ -1,13 +1,13 @@
 import { useReactFlow } from '@xyflow/react';
-import { exportToSvg } from '../utils/exportUtils';
 
 interface ToolbarProps {
   layout: 'hierarchical' | 'force' | 'circular';
   onLayoutChange: (layout: 'hierarchical' | 'force' | 'circular') => void;
   onColumnOrderClick: () => void;
+  onExport: () => void;
 }
 
-export default function Toolbar({ layout, onLayoutChange, onColumnOrderClick }: ToolbarProps) {
+export default function Toolbar({ layout, onLayoutChange, onColumnOrderClick, onExport }: ToolbarProps) {
   const { fitView } = useReactFlow();
 
   return (
@@ -37,7 +37,7 @@ export default function Toolbar({ layout, onLayoutChange, onColumnOrderClick }: 
           Reset View
         </button>
         <button
-          onClick={exportToSvg}
+          onClick={onExport}
           className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
         >
           Export SVG
