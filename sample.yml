@@ -1,0 +1,59 @@
+model:
+  name: "simple_slir"
+  version: "v0.0.1"
+  date: "2024-08-05" # YYYY-MM-DD
+
+  compartments:
+    - id: S
+      label: "Susceptible"
+    - id: L
+      label: "Latent"
+    - id: I_1
+      label: "Infectious 1"
+    - id: I_2
+      label: "Infectious 2"
+    - id: H_1
+      label: "Hospitalized 1"
+    - id: H_2
+      label: "Hospitalized 2"
+    - id: R
+      label: "Recovered"
+
+  transitions:
+    - type: mediated
+      source: S
+      target: L
+      mediators:
+        rate: beta_1
+        source: I_1
+    - type: mediated
+      source: S
+      target: L
+      mediators:
+        rate: beta_2
+        source: I_2
+    - type: spontaneous
+      source: L
+      target: I_1
+      rate: eps*p
+    - type: spontaneous
+      source: L
+      target: I_2
+      rate: eps*(1-p)
+    - type: spontaneous
+      source: I_1
+      target: H_1
+      rate: eta
+    - type: spontaneous
+      source: I_2
+      target: H_2
+      rate: eta
+    - type: spontaneous
+      source: H_1
+      target: R
+      rate: mu
+    - type: spontaneous
+      source: H_2
+      target: R
+      rate: mu
+    
