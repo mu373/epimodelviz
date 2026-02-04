@@ -5,6 +5,7 @@ interface DisplayOptions {
   showMediated: boolean;
   showVaccination: boolean;
   showLabels: boolean;
+  showCompartmentLabels: boolean;
   showMediators: boolean;
 }
 
@@ -41,11 +42,12 @@ export default function Sidebar({
   };
 
   const checkboxes: { key: keyof DisplayOptions; label: string }[] = [
-    { key: 'showSpontaneous', label: 'Show spontaneous transitions' },
-    { key: 'showMediated', label: 'Show mediated transitions' },
-    { key: 'showVaccination', label: 'Show vaccination transitions' },
-    { key: 'showLabels', label: 'Show rate labels' },
-    { key: 'showMediators', label: 'Show mediator connections' },
+    { key: 'showSpontaneous', label: 'Spontaneous transitions' },
+    { key: 'showMediated', label: 'Mediated transitions' },
+    { key: 'showVaccination', label: 'Vaccination transitions' },
+    { key: 'showLabels', label: 'Rate labels' },
+    { key: 'showCompartmentLabels', label: 'Compartment labels' },
+    { key: 'showMediators', label: 'Mediator connections' },
   ];
 
   return (

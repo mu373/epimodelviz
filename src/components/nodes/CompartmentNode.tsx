@@ -39,12 +39,14 @@ function CompartmentNode({ data }: NodeProps<CompartmentNodeType>) {
       </div>
 
       {/* Sublabel — positioned absolutely so it doesn't affect node measurement */}
-      <div
-        className="absolute text-center text-gray-500 leading-tight"
-        style={{ fontSize: 9, width: 80, wordWrap: 'break-word', top: 42 }}
-      >
-        {data.label}
-      </div>
+      {data.showLabel !== false && (
+        <div
+          className="absolute text-center text-gray-500 leading-tight"
+          style={{ fontSize: 9, width: 80, wordWrap: 'break-word', top: 42 }}
+        >
+          {data.label}
+        </div>
+      )}
 
       {/* Tooltip */}
       {hovered && (
