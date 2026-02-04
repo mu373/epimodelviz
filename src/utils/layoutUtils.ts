@@ -27,20 +27,28 @@ export function applyHierarchicalLayout(
   let x = 100;
   const xStep = 250;
 
+  // Use global row counts so nodes at the same row index align across columns
+  let maxNonVax = 0;
+  let maxVax = 0;
+  for (const col of Object.values(groups)) {
+    if (col.nonVax.length > maxNonVax) maxNonVax = col.nonVax.length;
+    if (col.vax.length > maxVax) maxVax = col.vax.length;
+  }
+  const totalRows = maxNonVax + maxVax;
+  const yStep = height / (totalRows + 1);
+
   orderedCols.forEach((colKey) => {
     const col = groups[colKey];
     if (!col) {
       x += xStep;
       return;
     }
-    const all = [...col.nonVax, ...col.vax];
-    const yStep = height / (all.length + 1);
 
     col.nonVax.forEach((node, i) => {
       node.position = { x, y: yStep * (i + 1) };
     });
     col.vax.forEach((node, i) => {
-      node.position = { x, y: yStep * (col.nonVax.length + i + 1) };
+      node.position = { x, y: yStep * (maxNonVax + i + 1) };
     });
     x += xStep;
   });
