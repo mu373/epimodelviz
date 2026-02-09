@@ -1,9 +1,12 @@
-import { useReducer, useMemo, useCallback, useRef } from 'react';
+import type React from 'react';
+import { createContext, useReducer, useMemo, useCallback, useRef } from 'react';
 import { useNodesState, useEdgesState, useReactFlow, type Node, type Edge } from '@xyflow/react';
 import type { CompartmentNodeData, TransitionEdgeData, MediatorGroup, ModelStats } from '../types/model';
 import { DEFAULT_COLUMN_ORDER } from '../constants/colors';
 import { parseModel } from '../utils/yamlParser';
 import { applyHierarchicalLayout, applyCircularLayout, applyForceLayout } from '../utils/layoutUtils';
+
+export const DispatchContext = createContext<React.Dispatch<Action>>(() => {});
 
 interface DisplayOptions {
   showSpontaneous: boolean;
@@ -23,16 +26,19 @@ interface AppState {
   stats: ModelStats | null;
   error: string | null;
   mediatorGroups: MediatorGroup[];
+  arcEdgeOffsets: Map<string, { x: number; y: number }>;
 }
 
-type Action =
+export type Action =
   | { type: 'SET_YAML'; payload: string }
   | { type: 'SET_DISPLAY_OPTION'; key: keyof DisplayOptions; value: boolean }
   | { type: 'SET_LAYOUT'; payload: 'hierarchical' | 'force' | 'circular' }
   | { type: 'SET_COLUMN_ORDER'; payload: string[] }
   | { type: 'TOGGLE_DIALOG' }
   | { type: 'SET_MODEL_RESULT'; stats: ModelStats; mediatorGroups: MediatorGroup[] }
-  | { type: 'SET_ERROR'; payload: string | null };
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'TOGGLE_EDGE_ARC'; edgeId: string; defaultOffset: { x: number; y: number } }
+  | { type: 'SET_ARC_OFFSET'; edgeId: string; offset: { x: number; y: number } };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -50,6 +56,17 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, stats: action.stats, mediatorGroups: action.mediatorGroups, error: null };
     case 'SET_ERROR':
       return { ...state, error: action.payload };
+    case 'TOGGLE_EDGE_ARC': {
+      const next = new Map(state.arcEdgeOffsets);
+      if (next.has(action.edgeId)) next.delete(action.edgeId);
+      else next.set(action.edgeId, action.defaultOffset);
+      return { ...state, arcEdgeOffsets: next };
+    }
+    case 'SET_ARC_OFFSET': {
+      const next = new Map(state.arcEdgeOffsets);
+      next.set(action.edgeId, action.offset);
+      return { ...state, arcEdgeOffsets: next };
+    }
     default:
       return state;
   }
@@ -71,6 +88,7 @@ const initialState: AppState = {
   stats: null,
   error: null,
   mediatorGroups: [],
+  arcEdgeOffsets: new Map<string, { x: number; y: number }>(),
 };
 
 export function useModelState() {
@@ -187,6 +205,13 @@ export function useModelState() {
 
   // Filter visible edges and assign nearest-side handles
   const visibleEdges = useMemo(() => {
+    const pickHandle = (prefix: 'source' | 'target', angle: number) => {
+      if (Math.abs(angle) < Math.PI / 4) return `${prefix}-right`;
+      if (Math.abs(angle) > (3 * Math.PI) / 4) return `${prefix}-left`;
+      if (angle > 0) return `${prefix}-bottom`;
+      return `${prefix}-top`;
+    };
+
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
     const filtered = edges.filter((e) => {
@@ -203,23 +228,34 @@ export function useModelState() {
       let targetHandle = 'target-left';
 
       if (src && tgt) {
-        const dx = tgt.position.x - src.position.x;
-        const dy = tgt.position.y - src.position.y;
-        const angle = Math.atan2(dy, dx);
+        const arcOff = state.arcEdgeOffsets.get(e.id);
 
-        // Pick the side facing the other node
-        if (Math.abs(angle) < Math.PI / 4) {
-          sourceHandle = 'source-right';
-          targetHandle = 'target-left';
-        } else if (Math.abs(angle) > (3 * Math.PI) / 4) {
-          sourceHandle = 'source-left';
-          targetHandle = 'target-right';
-        } else if (angle > 0) {
-          sourceHandle = 'source-bottom';
-          targetHandle = 'target-top';
+        if (arcOff) {
+          // For arced edges, both handles face toward the control point.
+          const cpx = (src.position.x + tgt.position.x) / 2 + arcOff.x;
+          const cpy = (src.position.y + tgt.position.y) / 2 + arcOff.y;
+
+          sourceHandle = pickHandle('source', Math.atan2(cpy - src.position.y, cpx - src.position.x));
+          targetHandle = pickHandle('target', Math.atan2(cpy - tgt.position.y, cpx - tgt.position.x));
         } else {
-          sourceHandle = 'source-top';
-          targetHandle = 'target-bottom';
+          // Straight edges: pick the side facing the other node
+          const dx = tgt.position.x - src.position.x;
+          const dy = tgt.position.y - src.position.y;
+          const angle = Math.atan2(dy, dx);
+
+          if (Math.abs(angle) < Math.PI / 4) {
+            sourceHandle = 'source-right';
+            targetHandle = 'target-left';
+          } else if (Math.abs(angle) > (3 * Math.PI) / 4) {
+            sourceHandle = 'source-left';
+            targetHandle = 'target-right';
+          } else if (angle > 0) {
+            sourceHandle = 'source-bottom';
+            targetHandle = 'target-top';
+          } else {
+            sourceHandle = 'source-top';
+            targetHandle = 'target-bottom';
+          }
         }
       }
 
@@ -227,7 +263,7 @@ export function useModelState() {
         ...e,
         sourceHandle,
         targetHandle,
-        data: { ...e.data!, showLabel: state.displayOptions.showLabels },
+        data: { ...e.data!, showLabel: state.displayOptions.showLabels, arcOffset: state.arcEdgeOffsets.get(e.id) },
       };
     });
 
@@ -254,7 +290,7 @@ export function useModelState() {
     }
 
     return filtered;
-  }, [edges, nodes, state.displayOptions]);
+  }, [edges, nodes, state.displayOptions, state.arcEdgeOffsets]);
 
   return {
     state,

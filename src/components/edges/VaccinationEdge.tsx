@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useCallback, useContext } from 'react';
 import {
   EdgeLabelRenderer,
   type EdgeProps,
   type Edge,
 } from '@xyflow/react';
 import type { TransitionEdgeData } from '../../types/model';
-import { getOffsetStraightPath } from '../../utils/edgeUtils';
+import { getOffsetStraightPath, getOffsetArcPath, getDefaultArcOffset } from '../../utils/edgeUtils';
+import { DispatchContext } from '../../hooks/useModelState';
+import EdgeContextMenu from './EdgeContextMenu';
+import ArcHandle from './ArcHandle';
 
 type VaccinationEdgeType = Edge<TransitionEdgeData, 'vaccination'>;
 
@@ -22,8 +25,25 @@ export default function VaccinationEdge({
   style,
 }: EdgeProps<VaccinationEdgeType>) {
   const [hovered, setHovered] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const dispatch = useContext(DispatchContext);
   const offsetPx = data?.offsetPx ?? 0;
-  const { path: edgePath, midX, midY } = getOffsetStraightPath(sourceX, sourceY, targetX, targetY, offsetPx);
+  const arcOffset = data?.arcOffset;
+
+  const straight = getOffsetStraightPath(sourceX, sourceY, targetX, targetY, offsetPx);
+  const arc = arcOffset
+    ? getOffsetArcPath(sourceX, sourceY, targetX, targetY, offsetPx, arcOffset)
+    : null;
+
+  const edgePath = arc?.path ?? straight.path;
+  const midX = arc?.midX ?? straight.midX;
+  const midY = arc?.midY ?? straight.midY;
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
 
   return (
     <>
@@ -36,6 +56,7 @@ export default function VaccinationEdge({
         style={{ cursor: 'pointer' }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onContextMenu={handleContextMenu}
       />
       {/* Visible edge */}
       <path
@@ -95,6 +116,32 @@ export default function VaccinationEdge({
             {data?.rate && <div style={{ color: '#d1d5db' }}>Rate: {data.rate}</div>}
           </div>
         </EdgeLabelRenderer>
+      )}
+      {/* Draggable arc handle */}
+      {arc && (
+        <ArcHandle
+          midX={arc.midX}
+          midY={arc.midY}
+          baseMidX={straight.midX}
+          baseMidY={straight.midY}
+          onOffsetChange={(offset) => dispatch({ type: 'SET_ARC_OFFSET', edgeId: id, offset })}
+        />
+      )}
+      {/* Context menu */}
+      {contextMenu && (
+        <EdgeContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          isArc={!!arcOffset}
+          onToggleArc={() =>
+            dispatch({
+              type: 'TOGGLE_EDGE_ARC',
+              edgeId: id,
+              defaultOffset: getDefaultArcOffset(sourceX, sourceY, targetX, targetY),
+            })
+          }
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </>
   );

@@ -87,6 +87,7 @@ function AppInner() {
               showMediators={state.displayOptions.showMediators}
               showMediated={state.displayOptions.showMediated}
               showLabels={state.displayOptions.showLabels}
+              dispatch={dispatch}
             />
           </div>
         </div>
