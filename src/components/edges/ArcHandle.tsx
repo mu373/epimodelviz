@@ -1,19 +1,31 @@
 import { useCallback, useRef } from 'react';
 import { EdgeLabelRenderer, useReactFlow } from '@xyflow/react';
 
+const NUDGE_PX = 14;
+
 interface ArcHandleProps {
   /** Curve midpoint (Bézier at t=0.5) in flow coordinates */
   midX: number;
   midY: number;
+  /** Control point — used to shift handle toward the outside of the curve */
+  cx: number;
+  cy: number;
   /** Straight-line midpoint (after parallel offset) — drag reference */
   baseMidX: number;
   baseMidY: number;
   onOffsetChange: (offset: { x: number; y: number }) => void;
 }
 
-export default function ArcHandle({ midX, midY, baseMidX, baseMidY, onOffsetChange }: ArcHandleProps) {
+export default function ArcHandle({ midX, midY, cx, cy, baseMidX, baseMidY, onOffsetChange }: ArcHandleProps) {
   const { screenToFlowPosition } = useReactFlow();
   const dragging = useRef(false);
+
+  // Shift handle display from midpoint toward control point to avoid label overlap
+  const dx = cx - midX;
+  const dy = cy - midY;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const displayX = len > 0 ? midX + (dx / len) * NUDGE_PX : midX;
+  const displayY = len > 0 ? midY + (dy / len) * NUDGE_PX : midY;
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -51,7 +63,7 @@ export default function ArcHandle({ midX, midY, baseMidX, baseMidY, onOffsetChan
         onMouseDown={handleMouseDown}
         style={{
           position: 'absolute',
-          transform: `translate(-50%, -50%) translate(${midX}px,${midY}px)`,
+          transform: `translate(-50%, -50%) translate(${displayX}px,${displayY}px)`,
           width: 28,
           height: 28,
           cursor: 'grab',

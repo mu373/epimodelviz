@@ -124,6 +124,8 @@ export default function SpontaneousEdge({
         <ArcHandle
           midX={arc.midX}
           midY={arc.midY}
+          cx={arc.cx}
+          cy={arc.cy}
           baseMidX={straight.midX}
           baseMidY={straight.midY}
           onOffsetChange={(offset) => dispatch({ type: 'SET_ARC_OFFSET', edgeId: id, offset })}
@@ -140,6 +142,7 @@ export default function SpontaneousEdge({
               type: 'TOGGLE_EDGE_ARC',
               edgeId: id,
               defaultOffset: getDefaultArcOffset(sourceX, sourceY, targetX, targetY),
+              isCurrentlyArc: !!arcOffset,
             })
           }
           onClose={() => setContextMenu(null)}

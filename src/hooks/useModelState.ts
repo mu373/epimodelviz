@@ -4,7 +4,11 @@ import { useNodesState, useEdgesState, useReactFlow, type Node, type Edge } from
 import type { CompartmentNodeData, TransitionEdgeData, MediatorGroup, ModelStats } from '../types/model';
 import { DEFAULT_COLUMN_ORDER } from '../constants/colors';
 import { parseModel } from '../utils/yamlParser';
+import { getDefaultArcOffset } from '../utils/edgeUtils';
 import { applyHierarchicalLayout, applyCircularLayout, applyForceLayout } from '../utils/layoutUtils';
+
+/** Distance (px) between nodes beyond which edges auto-arc */
+const AUTO_ARC_THRESHOLD = 500;
 
 export const DispatchContext = createContext<React.Dispatch<Action>>(() => {});
 
@@ -26,7 +30,7 @@ interface AppState {
   stats: ModelStats | null;
   error: string | null;
   mediatorGroups: MediatorGroup[];
-  arcEdgeOffsets: Map<string, { x: number; y: number }>;
+  arcEdgeOffsets: Map<string, { x: number; y: number } | null>;
 }
 
 export type Action =
@@ -37,7 +41,7 @@ export type Action =
   | { type: 'TOGGLE_DIALOG' }
   | { type: 'SET_MODEL_RESULT'; stats: ModelStats; mediatorGroups: MediatorGroup[] }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'TOGGLE_EDGE_ARC'; edgeId: string; defaultOffset: { x: number; y: number } }
+  | { type: 'TOGGLE_EDGE_ARC'; edgeId: string; defaultOffset: { x: number; y: number }; isCurrentlyArc: boolean }
   | { type: 'SET_ARC_OFFSET'; edgeId: string; offset: { x: number; y: number } };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -58,8 +62,22 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, error: action.payload };
     case 'TOGGLE_EDGE_ARC': {
       const next = new Map(state.arcEdgeOffsets);
-      if (next.has(action.edgeId)) next.delete(action.edgeId);
-      else next.set(action.edgeId, action.defaultOffset);
+      const current = next.get(action.edgeId);
+      if (current === null) {
+        // Was force-straight → remove override to let auto or default take over
+        next.delete(action.edgeId);
+      } else if (current) {
+        // Has explicit offset → force straight
+        next.set(action.edgeId, null);
+      } else {
+        // No entry → could be auto-arced or straight; toggle accordingly
+        // isCurrentlyArc flag is passed to decide direction
+        if (action.isCurrentlyArc) {
+          next.set(action.edgeId, null);
+        } else {
+          next.set(action.edgeId, action.defaultOffset);
+        }
+      }
       return { ...state, arcEdgeOffsets: next };
     }
     case 'SET_ARC_OFFSET': {
@@ -88,7 +106,7 @@ const initialState: AppState = {
   stats: null,
   error: null,
   mediatorGroups: [],
-  arcEdgeOffsets: new Map<string, { x: number; y: number }>(),
+  arcEdgeOffsets: new Map<string, { x: number; y: number } | null>(),
 };
 
 export function useModelState() {
@@ -227,13 +245,31 @@ export function useModelState() {
       let sourceHandle = 'source-right';
       let targetHandle = 'target-left';
 
-      if (src && tgt) {
-        const arcOff = state.arcEdgeOffsets.get(e.id);
+      // Resolve effective arc offset: explicit > auto-arc for long edges > none
+      let effectiveArc: { x: number; y: number } | undefined;
+      const stored = state.arcEdgeOffsets.get(e.id);
 
-        if (arcOff) {
+      if (stored === null) {
+        // Force straight — user override
+        effectiveArc = undefined;
+      } else if (stored) {
+        // Explicit offset
+        effectiveArc = stored;
+      } else if (src && tgt) {
+        // Auto-arc long edges
+        const dx = tgt.position.x - src.position.x;
+        const dy = tgt.position.y - src.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > AUTO_ARC_THRESHOLD) {
+          effectiveArc = getDefaultArcOffset(src.position.x, src.position.y, tgt.position.x, tgt.position.y);
+        }
+      }
+
+      if (src && tgt) {
+        if (effectiveArc) {
           // For arced edges, both handles face toward the control point.
-          const cpx = (src.position.x + tgt.position.x) / 2 + arcOff.x;
-          const cpy = (src.position.y + tgt.position.y) / 2 + arcOff.y;
+          const cpx = (src.position.x + tgt.position.x) / 2 + effectiveArc.x;
+          const cpy = (src.position.y + tgt.position.y) / 2 + effectiveArc.y;
 
           sourceHandle = pickHandle('source', Math.atan2(cpy - src.position.y, cpx - src.position.x));
           targetHandle = pickHandle('target', Math.atan2(cpy - tgt.position.y, cpx - tgt.position.x));
@@ -263,7 +299,7 @@ export function useModelState() {
         ...e,
         sourceHandle,
         targetHandle,
-        data: { ...e.data!, showLabel: state.displayOptions.showLabels, arcOffset: state.arcEdgeOffsets.get(e.id) },
+        data: { ...e.data!, showLabel: state.displayOptions.showLabels, arcOffset: effectiveArc },
       };
     });
 
