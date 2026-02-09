@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ModelStats } from '../types/model';
 
 interface DisplayOptions {
@@ -12,6 +13,7 @@ interface DisplayOptions {
 interface SidebarProps {
   yamlText: string;
   onYamlChange: (text: string) => void;
+  onFileImport: (text: string) => void;
   onVisualize: () => void;
   onLoadSample: () => void;
   displayOptions: DisplayOptions;
@@ -23,6 +25,7 @@ interface SidebarProps {
 export default function Sidebar({
   yamlText,
   onYamlChange,
+  onFileImport,
   onVisualize,
   onLoadSample,
   displayOptions,
@@ -30,15 +33,39 @@ export default function Sidebar({
   stats,
   error,
 }: SidebarProps) {
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const readFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      onYamlChange(text);
+      onFileImport(text);
     };
     reader.readAsText(file);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    readFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    readFile(file);
   };
 
   const checkboxes: { key: keyof DisplayOptions; label: string }[] = [
@@ -55,13 +82,18 @@ export default function Sidebar({
       {/* File Input */}
       <div className="mb-6">
         <h3 className="text-sm font-medium text-gray-900 mb-3">Input YAML</h3>
-        <label className="block">
+        <label
+          className="block"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <input type="file" accept=".yaml,.yml" className="hidden" onChange={handleFileUpload} />
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gray-400 transition-colors">
-            <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}>
+            <svg className={`mx-auto h-8 w-8 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="mt-2 text-sm text-gray-600">Click to upload YAML file</p>
+            <p className="mt-2 text-sm text-gray-600">Drop or click to upload YAML</p>
           </div>
         </label>
       </div>

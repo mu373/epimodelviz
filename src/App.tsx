@@ -22,6 +22,11 @@ function AppInner() {
     reorderColumns,
   } = useModelState();
 
+  const handleFileImport = useCallback((text: string) => {
+    dispatch({ type: 'SET_YAML', payload: text });
+    setTimeout(() => visualize(text), 0);
+  }, [dispatch, visualize]);
+
   const handleLoadSample = useCallback(async () => {
     try {
       const res = await fetch('/sample.yml');
@@ -62,6 +67,7 @@ function AppInner() {
         <Sidebar
           yamlText={state.yamlText}
           onYamlChange={(text) => dispatch({ type: 'SET_YAML', payload: text })}
+          onFileImport={handleFileImport}
           onVisualize={handleVisualize}
           onLoadSample={handleLoadSample}
           displayOptions={state.displayOptions}
