@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import {
-  getStraightPath,
   EdgeLabelRenderer,
   type EdgeProps,
   type Edge,
 } from '@xyflow/react';
 import type { TransitionEdgeData } from '../../types/model';
+import { getOffsetStraightPath } from '../../utils/edgeUtils';
 
 type VaccinationEdgeType = Edge<TransitionEdgeData, 'vaccination'>;
 
@@ -22,10 +22,8 @@ export default function VaccinationEdge({
   style,
 }: EdgeProps<VaccinationEdgeType>) {
   const [hovered, setHovered] = useState(false);
-  const [edgePath] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-
-  const midX = (sourceX + targetX) / 2;
-  const midY = (sourceY + targetY) / 2;
+  const offsetPx = data?.offsetPx ?? 0;
+  const { path: edgePath, midX, midY } = getOffsetStraightPath(sourceX, sourceY, targetX, targetY, offsetPx);
 
   return (
     <>

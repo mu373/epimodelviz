@@ -189,7 +189,7 @@ export function useModelState() {
   const visibleEdges = useMemo(() => {
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
-    return edges.filter((e) => {
+    const filtered = edges.filter((e) => {
       const t = e.data?.type ?? e.type;
       if (t === 'spontaneous' && !state.displayOptions.showSpontaneous) return false;
       if (t === 'mediated' && !state.displayOptions.showMediated) return false;
@@ -230,6 +230,30 @@ export function useModelState() {
         data: { ...e.data!, showLabel: state.displayOptions.showLabels },
       };
     });
+
+    // Assign perpendicular offsets for parallel edges (same node pair, any direction)
+    const GAP = 12;
+    const pairGroups = new Map<string, number[]>();
+    for (let i = 0; i < filtered.length; i++) {
+      const key = [filtered[i].source, filtered[i].target].sort().join('\0');
+      if (!pairGroups.has(key)) pairGroups.set(key, []);
+      pairGroups.get(key)!.push(i);
+    }
+    for (const [key, indices] of pairGroups.entries()) {
+      if (indices.length <= 1) continue;
+      const [canonicalFirst] = key.split('\0');
+      const n = indices.length;
+      for (let j = 0; j < n; j++) {
+        const e = filtered[indices[j]];
+        const offset = (j - (n - 1) / 2) * GAP;
+        // Negate offset for edges whose source→target is reversed vs canonical sort order,
+        // because the perpendicular vector flips with the direction.
+        const sign = e.source === canonicalFirst ? 1 : -1;
+        filtered[indices[j]] = { ...e, data: { ...e.data!, offsetPx: offset * sign } };
+      }
+    }
+
+    return filtered;
   }, [edges, nodes, state.displayOptions]);
 
   return {
