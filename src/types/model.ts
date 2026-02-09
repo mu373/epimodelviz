@@ -56,6 +56,8 @@ export interface TransitionEdgeData {
   type: string;
   rate: string;
   showLabel: boolean;
+  offsetPx?: number;
+  arcOffset?: { x: number; y: number };
 }
 
 export interface ModelStats {

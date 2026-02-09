@@ -1,3 +1,4 @@
+import type React from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -16,6 +17,7 @@ import VaccinationEdge from './edges/VaccinationEdge';
 import MediatorOverlay from './MediatorOverlay';
 import Legend from './Legend';
 import type { CompartmentNodeData, TransitionEdgeData, MediatorGroup } from '../types/model';
+import { DispatchContext, type Action } from '../hooks/useModelState';
 
 const nodeTypes = {
   compartment: CompartmentNode,
@@ -36,6 +38,7 @@ interface FlowCanvasProps {
   showMediators: boolean;
   showMediated: boolean;
   showLabels: boolean;
+  dispatch: React.Dispatch<Action>;
 }
 
 export default function FlowCanvas({
@@ -47,6 +50,7 @@ export default function FlowCanvas({
   showMediators,
   showMediated,
   showLabels,
+  dispatch,
 }: FlowCanvasProps) {
   const hasModel = nodes.length > 0;
 
@@ -68,6 +72,7 @@ export default function FlowCanvas({
           </div>
         </div>
       )}
+      <DispatchContext.Provider value={dispatch}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -95,6 +100,7 @@ export default function FlowCanvas({
           showLabels={showLabels}
         />
       </ReactFlow>
+      </DispatchContext.Provider>
       {hasModel && <Legend />}
     </div>
   );

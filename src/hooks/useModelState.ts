@@ -1,9 +1,16 @@
-import { useReducer, useMemo, useCallback, useRef } from 'react';
+import type React from 'react';
+import { createContext, useReducer, useMemo, useCallback, useRef } from 'react';
 import { useNodesState, useEdgesState, useReactFlow, type Node, type Edge } from '@xyflow/react';
 import type { CompartmentNodeData, TransitionEdgeData, MediatorGroup, ModelStats } from '../types/model';
 import { DEFAULT_COLUMN_ORDER } from '../constants/colors';
 import { parseModel } from '../utils/yamlParser';
+import { getDefaultArcOffset } from '../utils/edgeUtils';
 import { applyHierarchicalLayout, applyCircularLayout, applyForceLayout } from '../utils/layoutUtils';
+
+/** Distance (px) between nodes beyond which edges auto-arc */
+const AUTO_ARC_THRESHOLD = 500;
+
+export const DispatchContext = createContext<React.Dispatch<Action>>(() => {});
 
 interface DisplayOptions {
   showSpontaneous: boolean;
@@ -23,16 +30,19 @@ interface AppState {
   stats: ModelStats | null;
   error: string | null;
   mediatorGroups: MediatorGroup[];
+  arcEdgeOffsets: Map<string, { x: number; y: number } | null>;
 }
 
-type Action =
+export type Action =
   | { type: 'SET_YAML'; payload: string }
   | { type: 'SET_DISPLAY_OPTION'; key: keyof DisplayOptions; value: boolean }
   | { type: 'SET_LAYOUT'; payload: 'hierarchical' | 'force' | 'circular' }
   | { type: 'SET_COLUMN_ORDER'; payload: string[] }
   | { type: 'TOGGLE_DIALOG' }
   | { type: 'SET_MODEL_RESULT'; stats: ModelStats; mediatorGroups: MediatorGroup[] }
-  | { type: 'SET_ERROR'; payload: string | null };
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'TOGGLE_EDGE_ARC'; edgeId: string; defaultOffset: { x: number; y: number }; isCurrentlyArc: boolean }
+  | { type: 'SET_ARC_OFFSET'; edgeId: string; offset: { x: number; y: number } };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -50,6 +60,31 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, stats: action.stats, mediatorGroups: action.mediatorGroups, error: null };
     case 'SET_ERROR':
       return { ...state, error: action.payload };
+    case 'TOGGLE_EDGE_ARC': {
+      const next = new Map(state.arcEdgeOffsets);
+      const current = next.get(action.edgeId);
+      if (current === null) {
+        // Was force-straight → remove override to let auto or default take over
+        next.delete(action.edgeId);
+      } else if (current) {
+        // Has explicit offset → force straight
+        next.set(action.edgeId, null);
+      } else {
+        // No entry → could be auto-arced or straight; toggle accordingly
+        // isCurrentlyArc flag is passed to decide direction
+        if (action.isCurrentlyArc) {
+          next.set(action.edgeId, null);
+        } else {
+          next.set(action.edgeId, action.defaultOffset);
+        }
+      }
+      return { ...state, arcEdgeOffsets: next };
+    }
+    case 'SET_ARC_OFFSET': {
+      const next = new Map(state.arcEdgeOffsets);
+      next.set(action.edgeId, action.offset);
+      return { ...state, arcEdgeOffsets: next };
+    }
     default:
       return state;
   }
@@ -71,6 +106,7 @@ const initialState: AppState = {
   stats: null,
   error: null,
   mediatorGroups: [],
+  arcEdgeOffsets: new Map<string, { x: number; y: number } | null>(),
 };
 
 export function useModelState() {
@@ -187,9 +223,16 @@ export function useModelState() {
 
   // Filter visible edges and assign nearest-side handles
   const visibleEdges = useMemo(() => {
+    const pickHandle = (prefix: 'source' | 'target', angle: number) => {
+      if (Math.abs(angle) < Math.PI / 4) return `${prefix}-right`;
+      if (Math.abs(angle) > (3 * Math.PI) / 4) return `${prefix}-left`;
+      if (angle > 0) return `${prefix}-bottom`;
+      return `${prefix}-top`;
+    };
+
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
-    return edges.filter((e) => {
+    const filtered = edges.filter((e) => {
       const t = e.data?.type ?? e.type;
       if (t === 'spontaneous' && !state.displayOptions.showSpontaneous) return false;
       if (t === 'mediated' && !state.displayOptions.showMediated) return false;
@@ -202,24 +245,53 @@ export function useModelState() {
       let sourceHandle = 'source-right';
       let targetHandle = 'target-left';
 
-      if (src && tgt) {
+      // Resolve effective arc offset: explicit > auto-arc for long edges > none
+      let effectiveArc: { x: number; y: number } | undefined;
+      const stored = state.arcEdgeOffsets.get(e.id);
+
+      if (stored === null) {
+        // Force straight — user override
+        effectiveArc = undefined;
+      } else if (stored) {
+        // Explicit offset
+        effectiveArc = stored;
+      } else if (src && tgt) {
+        // Auto-arc long edges
         const dx = tgt.position.x - src.position.x;
         const dy = tgt.position.y - src.position.y;
-        const angle = Math.atan2(dy, dx);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > AUTO_ARC_THRESHOLD) {
+          effectiveArc = getDefaultArcOffset(src.position.x, src.position.y, tgt.position.x, tgt.position.y);
+        }
+      }
 
-        // Pick the side facing the other node
-        if (Math.abs(angle) < Math.PI / 4) {
-          sourceHandle = 'source-right';
-          targetHandle = 'target-left';
-        } else if (Math.abs(angle) > (3 * Math.PI) / 4) {
-          sourceHandle = 'source-left';
-          targetHandle = 'target-right';
-        } else if (angle > 0) {
-          sourceHandle = 'source-bottom';
-          targetHandle = 'target-top';
+      if (src && tgt) {
+        if (effectiveArc) {
+          // For arced edges, both handles face toward the control point.
+          const cpx = (src.position.x + tgt.position.x) / 2 + effectiveArc.x;
+          const cpy = (src.position.y + tgt.position.y) / 2 + effectiveArc.y;
+
+          sourceHandle = pickHandle('source', Math.atan2(cpy - src.position.y, cpx - src.position.x));
+          targetHandle = pickHandle('target', Math.atan2(cpy - tgt.position.y, cpx - tgt.position.x));
         } else {
-          sourceHandle = 'source-top';
-          targetHandle = 'target-bottom';
+          // Straight edges: pick the side facing the other node
+          const dx = tgt.position.x - src.position.x;
+          const dy = tgt.position.y - src.position.y;
+          const angle = Math.atan2(dy, dx);
+
+          if (Math.abs(angle) < Math.PI / 4) {
+            sourceHandle = 'source-right';
+            targetHandle = 'target-left';
+          } else if (Math.abs(angle) > (3 * Math.PI) / 4) {
+            sourceHandle = 'source-left';
+            targetHandle = 'target-right';
+          } else if (angle > 0) {
+            sourceHandle = 'source-bottom';
+            targetHandle = 'target-top';
+          } else {
+            sourceHandle = 'source-top';
+            targetHandle = 'target-bottom';
+          }
         }
       }
 
@@ -227,10 +299,34 @@ export function useModelState() {
         ...e,
         sourceHandle,
         targetHandle,
-        data: { ...e.data!, showLabel: state.displayOptions.showLabels },
+        data: { ...e.data!, showLabel: state.displayOptions.showLabels, arcOffset: effectiveArc },
       };
     });
-  }, [edges, nodes, state.displayOptions]);
+
+    // Assign perpendicular offsets for parallel edges (same node pair, any direction)
+    const GAP = 12;
+    const pairGroups = new Map<string, number[]>();
+    for (let i = 0; i < filtered.length; i++) {
+      const key = [filtered[i].source, filtered[i].target].sort().join('\0');
+      if (!pairGroups.has(key)) pairGroups.set(key, []);
+      pairGroups.get(key)!.push(i);
+    }
+    for (const [key, indices] of pairGroups.entries()) {
+      if (indices.length <= 1) continue;
+      const [canonicalFirst] = key.split('\0');
+      const n = indices.length;
+      for (let j = 0; j < n; j++) {
+        const e = filtered[indices[j]];
+        const offset = (j - (n - 1) / 2) * GAP;
+        // Negate offset for edges whose source→target is reversed vs canonical sort order,
+        // because the perpendicular vector flips with the direction.
+        const sign = e.source === canonicalFirst ? 1 : -1;
+        filtered[indices[j]] = { ...e, data: { ...e.data!, offsetPx: offset * sign } };
+      }
+    }
+
+    return filtered;
+  }, [edges, nodes, state.displayOptions, state.arcEdgeOffsets]);
 
   return {
     state,
